@@ -14,7 +14,7 @@ A web app for rendering configurations from a Jinja template and Excel/CSV data.
 - Docker (recommended), or
 - a web browser (Chrome/Edge/Firefox) to run without Docker
 
-Note: the app is static (no backend), but libraries are loaded from CDN, so internet access is required.
+Note: the app is static (no backend), but libraries are loaded from CDN, so internet access is required. 
 
 ## Install And Run
 

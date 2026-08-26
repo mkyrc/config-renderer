@@ -5,31 +5,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
 
 jobs:
-  validate-version:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Validate tag matches VERSION
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          FILE_VERSION="$(tr -d '[:space:]' < VERSION)"
-          if [[ -z "$FILE_VERSION" ]]; then
-            echo "VERSION file is empty"
-            exit 1
-          fi
-          if [[ "$TAG_VERSION" != "$FILE_VERSION" ]]; then
-            echo "Tag version ($TAG_VERSION) does not match VERSION file ($FILE_VERSION)"
-            exit 1
-          fi
-          echo "Version check passed: $TAG_VERSION"
-
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -95,80 +72,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  publish-tag:
-    runs-on: ubuntu-latest
-    needs:
-      - verify
-      - validate-version
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=tag
-            type=sha
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  deploy-pages-tag:
-    runs-on: ubuntu-latest
-    needs:
-      - publish-tag
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Prepare Pages artifact
-        run: |
-          mkdir -p public
-          cp src/jinja_config_renderer.html public/index.html
-          cp VERSION public/VERSION
-          APP_VERSION="$(tr -d '\r\n' < VERSION)"
-          sed -i "s|__APP_VERSION__|${APP_VERSION}|g" public/index.html
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 

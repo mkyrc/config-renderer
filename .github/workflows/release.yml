@@ -50,6 +50,7 @@ jobs:
           IMAGE="ghcr.io/${{ github.repository }}:${TAG}"
           PACKAGE_URL="https://github.com/${{ github.repository }}/pkgs/container/${{ github.event.repository.name }}"
           README_URL="https://github.com/${{ github.repository }}#readme"
+          PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
 
           cat > release-notes.md <<EOF
 
@@ -69,6 +70,8 @@ jobs:
           Open in browser: http://localhost:8080
 
           ## Usage
+
+          Web app (GitHub Pages): $PAGES_URL
 
           See README: $README_URL
 

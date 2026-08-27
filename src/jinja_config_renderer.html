@@ -265,9 +265,9 @@ templateEditor.setValue(`# example template for a network device
 hostname {{ hostname }}
 
 interface {{ interface }}
- description Uplink
+ description Example config
  ip address {{ ip_address }} {{ subnet_mask }}
- switchport access vlan {{ vlan }}`, -1);
+ no shutdown`, -1);
 templateEditor.session.on('change', render);
 
 async function loadTemplate(file) {

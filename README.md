@@ -14,11 +14,15 @@ A web app for rendering configurations from a Jinja template and Excel/CSV data.
 - Docker (recommended), or
 - a web browser (Chrome/Edge/Firefox) to run without Docker
 
-Note: the app is static (no backend), but libraries are loaded from CDN, so internet access is required. 
+Note: the app is static (no backend), but libraries are loaded from CDN, so internet access is required.
 
 ## Install And Run
 
-### Recommended: Docker
+### Live Demo
+
+[Config Renderer Online](https://mkyrc.github.io/config-renderer/)
+
+### Use Docker image (Recommended)
 
 Pull and run the published image from GHCR:
 
@@ -33,7 +37,7 @@ Then open in your browser:
 http://localhost:8080
 ```
 
-### Optional: Build Locally
+### Build Locally (Optional)
 
 If you want to build from source instead of using GHCR:
 
@@ -42,7 +46,7 @@ docker build -t config-renderer:local .
 docker run --rm -p 8080:8080 --name config-renderer config-renderer:local
 ```
 
-### Alternative: Without Docker
+### Alternative
 
 Open `src/jinja_config_renderer.html` directly in your browser.
 
@@ -72,15 +76,15 @@ Tip: the `data/` folder contains sample files (`test.csv`, `data.xlsx`, `config.
 
 ![alt text](doc-resources/config-generator-example.png)
 
-
 ## Common Issues
 
 - Page does not open on `localhost:8080`:
-   - check if the container is running: `docker ps`
-   - if the port is in use, change mapping, for example: `-p 8081:8080`
+  - check if the container is running: `docker ps`
+  - if the port is in use, change mapping, for example: `-p 8081:8080`
 
 - Docker is not available:
-   - use the without-Docker alternative above
+  - use [Config Renderer Live Demo](https://mkyrc.github.io/config-renderer/) 
+  - or open `src/jinja_config_renderer.html` directly in your browser
 
 - Library loading fails:
-   - verify internet connectivity (CDN scripts)
+  - verify internet connectivity (CDN scripts)

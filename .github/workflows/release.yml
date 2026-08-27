@@ -80,6 +80,7 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.image.outputs.image }}
+      image_latest: ${{ steps.image.outputs.image_latest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -88,6 +89,7 @@ jobs:
         id: image
         run: |
           echo "image=ghcr.io/${{ github.repository }}:${{ needs.validate-version-and-tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "image_latest=ghcr.io/${{ github.repository }}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -104,7 +106,11 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.image.outputs.image }}
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ steps.image.outputs.image }}
+            ${{ steps.image.outputs.image_latest }}
 
   prepare-and-deploy-pages:
     runs-on: ubuntu-latest
@@ -154,6 +160,7 @@ jobs:
         run: |
           TAG="${{ needs.validate-version-and-tag.outputs.tag }}"
           IMAGE="${{ needs.build-and-push-docker-image.outputs.image }}"
+          IMAGE_LATEST="${{ needs.build-and-push-docker-image.outputs.image_latest }}"
           PACKAGE_URL="https://github.com/${{ github.repository }}/pkgs/container/${{ github.event.repository.name }}"
           README_URL="https://github.com/${{ github.repository }}#readme"
           PAGES_URL="${{ needs.prepare-and-deploy-pages.outputs.page_url }}"
@@ -164,8 +171,9 @@ jobs:
           
           ## Docker Image
 
-          - Tag: $TAG
-          - Image: $IMAGE
+          - Tags: $TAG, latest
+          - Versioned image: $IMAGE
+          - Latest image: $IMAGE_LATEST
           - Package page: $PACKAGE_URL
 
           ## Run with Docker

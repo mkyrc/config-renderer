@@ -4,14 +4,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
-  create-version-tag:
+  validate-version-and-tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,18 +38,56 @@ jobs:
       - name: Ensure tag does not exist
         run: |
           TAG="${{ steps.version.outputs.tag }}"
+          git fetch --tags --force
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists"
             exit 1
           fi
 
+  create-version-tag:
+    runs-on: ubuntu-latest
+    needs: validate-version-and-tag
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ needs.validate-version-and-tag.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Create and push release tag
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
+          TAG="${{ needs.validate-version-and-tag.outputs.tag }}"
+          git fetch --tags --force
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "Release $TAG"
           git push origin "$TAG"
+
+  build-and-push-docker-image:
+    runs-on: ubuntu-latest
+    needs:
+      - validate-version-and-tag
+      - create-version-tag
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image reference
+        id: image
+        run: |
+          echo "image=ghcr.io/${{ github.repository }}:${{ needs.validate-version-and-tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -60,17 +100,33 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push tag image
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          IMAGE="ghcr.io/${{ github.repository }}:${TAG}"
-          docker buildx build --push --tag "$IMAGE" .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.image.outputs.image }}
+
+  prepare-and-deploy-pages:
+    runs-on: ubuntu-latest
+    needs:
+      - validate-version-and-tag
+      - create-version-tag
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Prepare Pages artifact
         run: |
           mkdir -p public
           cp src/jinja_config_renderer.html public/index.html
           cp VERSION public/VERSION
-          APP_VERSION="$(tr -d '\r\n' < VERSION)"
+          APP_VERSION="${{ needs.validate-version-and-tag.outputs.version }}"
           sed -i "s|__APP_VERSION__|${APP_VERSION}|g" public/index.html
 
       - name: Configure GitHub Pages
@@ -85,13 +141,22 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  create-release-notes:
+    runs-on: ubuntu-latest
+    needs:
+      - validate-version-and-tag
+      - build-and-push-docker-image
+      - prepare-and-deploy-pages
+    permissions:
+      contents: write
+    steps:
       - name: Prepare release notes
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          IMAGE="ghcr.io/${{ github.repository }}:${TAG}"
+          TAG="${{ needs.validate-version-and-tag.outputs.tag }}"
+          IMAGE="${{ needs.build-and-push-docker-image.outputs.image }}"
           PACKAGE_URL="https://github.com/${{ github.repository }}/pkgs/container/${{ github.event.repository.name }}"
           README_URL="https://github.com/${{ github.repository }}#readme"
-          PAGES_URL="${{ steps.deployment.outputs.page_url }}"
+          PAGES_URL="${{ needs.prepare-and-deploy-pages.outputs.page_url }}"
 
           cat > release-notes.md <<EOF
 
@@ -121,6 +186,6 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.validate-version-and-tag.outputs.tag }}
+          name: Release ${{ needs.validate-version-and-tag.outputs.tag }}
           body_path: release-notes.md

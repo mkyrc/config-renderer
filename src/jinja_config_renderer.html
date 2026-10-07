@@ -180,6 +180,20 @@ let missingValueCheckEnabled = true;
 let insertedValueHighlightEnabled = false;
 let templateEditor;
 
+const DEFAULT_TEMPLATE = `# example template for a network device
+
+hostname {{ hostname }}
+
+interface {{ interface }}
+ description Example config
+ ip address {{ ip_address }} {{ subnet_mask }}
+ no shutdown`;
+
+const DEFAULT_EXAMPLE_CSV = `hostname,interface,ip_address,subnet_mask
+switch-01,Gi0/0,192.168.10.10,255.255.255.0
+switch-02,Gi0/1,192.168.10.20,255.255.255.0
+switch-03,Gi0/2,192.168.10.30,255.255.255.0`;
+
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
 const templateDrop = document.getElementById('templateDrop');
@@ -260,15 +274,46 @@ templateEditor.setOptions({
   highlightActiveLine: true,
   highlightSelectedWord: true,
 });
-templateEditor.setValue(`# example template for a network device
-
-hostname {{ hostname }}
-
-interface {{ interface }}
- description Example config
- ip address {{ ip_address }} {{ subnet_mask }}
- no shutdown`, -1);
+templateEditor.setValue(DEFAULT_TEMPLATE, -1);
 templateEditor.session.on('change', render);
+
+initializeDemoData();
+
+async function initializeDemoData() {
+  document.getElementById('excelStatus').textContent = 'Loading demo data...';
+
+  try {
+    const csvResponse = await fetch('../data/test.csv');
+    const csvText = csvResponse.ok ? await csvResponse.text() : DEFAULT_EXAMPLE_CSV;
+    workbook = XLSX.read(csvText, { type: 'string' });
+    buildSheetSelector();
+    loadSelectedSheet();
+    document.getElementById('fileName').textContent = 'demo: test.csv';
+    document.getElementById('excelStatus').textContent = 'Demo data loaded automatically.';
+  } catch (e) {
+    const demoCsvBlob = new Blob([DEFAULT_EXAMPLE_CSV], {type:'text/csv;charset=utf-8'});
+    const demoFile = new File([demoCsvBlob], 'example-data.csv', {type:'text/csv'});
+    document.getElementById('fileName').textContent = demoFile.name;
+    workbook = XLSX.read(DEFAULT_EXAMPLE_CSV, { type: 'string' });
+    buildSheetSelector();
+    loadSelectedSheet();
+    document.getElementById('excelStatus').textContent = 'Demo data loaded automatically.';
+  }
+
+  try {
+    const templateResponse = await fetch('../data/config.j2');
+    if (templateResponse.ok) {
+      const templateText = await templateResponse.text();
+      if (templateText && templateText.trim()) {
+        templateEditor.setValue(templateText, -1);
+        templateFileName.textContent = 'demo: config.j2';
+        render();
+      }
+    }
+  } catch (e) {
+    templateEditor.setValue(DEFAULT_TEMPLATE, -1);
+  }
+}
 
 async function loadTemplate(file) {
   templateFileName.textContent = file.name;
@@ -476,12 +521,13 @@ function transformTemplateForHighlights(source) {
 }
 
 function markValueForHighlight(value, label) {
-  if (value === undefined || value === null || value === '') {
-    if (!missingValueCheckEnabled) return '';
-    const token = `__MISSING_VALUE_${missingTokens.length}__`;
-    missingTokens.push({token, label});
-    return token;
-  }
+const normalizedValue = value === undefined || value === null ? '' : String(value).trim();
+if (normalizedValue === '') {
+  if (!missingValueCheckEnabled) return '';
+  const token = `__MISSING_VALUE_${missingTokens.length}__`;
+  missingTokens.push({token, label});
+  return token;
+}
 
   if (!insertedValueHighlightEnabled) {
     return value;

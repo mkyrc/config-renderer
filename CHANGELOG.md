@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog,
 and this project follows Semantic Versioning.
 
+## [1.1.3] - 2026-10-07
+
+### Added
+
+- Added default excel data sheet
+
 ## [1.1.1] - 2026-08-26
 
 ### Added
